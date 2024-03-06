@@ -5,43 +5,61 @@ fun main() {
     val client = ChargeBeeClient()
 
     val items = client.getAllItems(env)
-    val itemsToItemTypes = items.groupBy { it.type }
+    val itemsById = items.associateBy { it.id }
     val itemPrices = client.getAllItemPrices(env, items.map { it.id }.toSet())
-    val itemPriceIdToItemType = itemPrices.map { it.id to itemsToItemTypes[it.itemId] }.toMap()
-    val itemPricesByTypes = itemPrices.groupBy { itemsToItemTypes[it.itemId] }
+    val itemPriceIdToItemType = itemPrices
+        .filter { itemsById.contains(it.itemId) }
+        .map { it.id to itemsById[it.itemId]!!.type }
+        .toMap()
+    val itemPricesByTypes = itemPrices
+        .filter { itemsById.contains(it.itemId) }
+        .groupBy { itemsById[it.itemId]!!.type }
 
     client.getAllLineItemDiscounts(env)
         .forEach { discount ->
-            var skip = false
-            discount.itemConstraints
-                .forEach { constraint ->
-                    if (constraint.targetType == ChargebeeItemConstraint.TargetType.ALL) {
-                        skip = true
-                        println("Coupon ${discount.id} is applied to all ${constraint.itemType}s")
+            val updatedConstraints = discount.itemConstraints
+                .map { constraint ->
+                    if (constraint.targetType == ChargebeeItemConstraint.TargetType.ALL
+                        || constraint.targetType == ChargebeeItemConstraint.TargetType.NONE
+                    ) {
+                        println("Coupon ${discount.id} with constraint ${constraint.itemType} is applied to all ${constraint.itemType}s")
+                        constraint
+                    } else {
+                        val itemPriceIds = constraint.itemIds
+
+                        if (itemPriceIds.isEmpty()) {
+                            // change it to none instead when there is no item price ids, to avoid confusion
+                            return@map ChargebeeItemConstraint(
+                                targetType = ChargebeeItemConstraint.TargetType.NONE,
+                                itemType = constraint.itemType
+                            )
+                        }
+
+                        val applicableItemTypes = itemPriceIds.mapNotNull { itemPriceIdToItemType[it] }.distinct()
+
+                        if (applicableItemTypes.size > 1) {
+                            println("Coupon ${discount.id} with constraint ${constraint.itemType} is applied to multiple item types: $applicableItemTypes")
+                        }
+
+                        val allItemPriceIdsByTypes = applicableItemTypes.flatMap { itemType ->
+                            itemPricesByTypes[itemType]?.map {
+                                it.id
+                            } ?: emptyList()
+                        }.toSet()
+
+                        // Find out the missing items
+                        val missingItemPriceIds = allItemPriceIdsByTypes - itemPriceIds
+                        if (missingItemPriceIds.isNotEmpty()) {
+                            println("Coupon ${discount.id} with constraint ${constraint.itemType}: Missing item prices: $missingItemPriceIds")
+                            constraint.copy(itemIds = allItemPriceIdsByTypes + itemPriceIds)
+                        } else {
+                            constraint
+                        }
                     }
                 }
-            if (skip) return@forEach
 
-            val itemPriceIds = discount.itemConstraints.flatMap { constraint ->
-                constraint.itemIds
-            }.toSet()
-
-            val applicableItemTypes = itemPriceIds.map { itemPriceIdToItemType[it] }.distinct()
-
-            if (applicableItemTypes.size > 1) {
-                println("Coupon $discount.id is applied to multiple item types: $applicableItemTypes")
-            }
-
-            applicableItemTypes.forEach { itemType ->
-                val allItemPriceIdsOfType = itemPricesByTypes[itemType]?.map {
-                    it.id
-                } ?: emptyList()
-
-                // Find out the missing items
-                val missingItemPriceIds = allItemPriceIdsOfType - itemPriceIds
-                if (missingItemPriceIds.isNotEmpty()) {
-                    println("Coupon ${discount.id}: Missing item prices: $missingItemPriceIds")
-                }
+            if (updatedConstraints.any { !discount.itemConstraints.contains(it) }) {
+                client.updateDiscountConstraints(env, discount.id, updatedConstraints)
             }
 
         }

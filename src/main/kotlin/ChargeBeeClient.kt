@@ -7,6 +7,7 @@ import com.chargebee.ListResult
 import com.chargebee.internal.ListRequest
 import com.chargebee.models.Coupon
 import com.chargebee.models.Item
+import com.chargebee.org.json.JSONArray
 
 class ChargeBeeClient() {
     fun getAllItems(env: ChargebeeEnvironment): List<ChargebeeItem> = CbItem.list()
@@ -53,23 +54,8 @@ class ChargeBeeClient() {
         }
 
     private fun Coupon.ItemConstraint.toDomainModel(): ChargebeeItemConstraint? {
-        val targetType = when (constraint()) {
-            Coupon.ItemConstraint.Constraint.ALL -> ChargebeeItemConstraint.TargetType.ALL
-            Coupon.ItemConstraint.Constraint.SPECIFIC -> ChargebeeItemConstraint.TargetType.SPECIFIC
-            else -> {
-//                println("Unsupported constraint type ${constraint().name} for the coupon")
-                return null
-            }
-        }
-
-        val itemType = when (itemType()) {
-            Coupon.ItemConstraint.ItemType.PLAN -> ChargebeeItemConstraint.ItemType.PLAN
-            Coupon.ItemConstraint.ItemType.ADDON -> ChargebeeItemConstraint.ItemType.ADDON
-            else -> {
-//                println("Unsupported item type ${itemType().name} for the coupon")
-                return null
-            }
-        }
+        val targetType = ChargebeeItemConstraint.TargetType.valueOf(constraint().name)
+        val itemType = ChargebeeItemConstraint.ItemType.valueOf(itemType().name)
 
         val itemIds = if (targetType == ChargebeeItemConstraint.TargetType.SPECIFIC) {
             itemPriceIds()?.map { it.toString() }?.toSet() ?: emptySet()
@@ -88,6 +74,23 @@ class ChargeBeeClient() {
                 yieldAll(result)
             } while (nextOffset != null)
         }
+
+    fun updateDiscountConstraints(
+        env: ChargebeeEnvironment,
+        discountId: String,
+        constraints: List<ChargebeeItemConstraint>,
+    ) {
+        Coupon.updateForItems(discountId).apply {
+            constraints.forEachIndexed { idx, constraint ->
+                this.itemConstraintItemType(idx, Coupon.ItemConstraint.ItemType.valueOf(constraint.itemType.name))
+                this.itemConstraintConstraint(idx, Coupon.ItemConstraint.Constraint.valueOf(constraint.targetType.name))
+                if (constraint.targetType == ChargebeeItemConstraint.TargetType.SPECIFIC) {
+                    this.itemConstraintItemPriceIds(idx, JSONArray().putAll(constraint.itemIds))
+                }
+            }
+        }.request(env)
+
+    }
 }
 
 data class ChargebeeDiscount(
@@ -121,7 +124,7 @@ data class ChargebeeItemConstraint(
     enum class TargetType(value: String) {
         ALL("all"),
         SPECIFIC("specific"),
-        OTHER("other")
+        NONE("none"),
     }
 
     /**
@@ -130,6 +133,7 @@ data class ChargebeeItemConstraint(
     enum class ItemType(value: String) {
         PLAN("plan"),
         ADDON("addon"),
+        CHARGE("charge"),
     }
 
     /**
