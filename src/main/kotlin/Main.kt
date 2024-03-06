@@ -1,15 +1,14 @@
 package org.example
 
-import com.chargebee.models.Export.ItemPricesRequest
-
 fun main() {
     val env = ChargebeeEnvironment("site", "the-key")
     val client = ChargeBeeClient()
 
-    val itemIds = client.getAllItemId(env)
-    val itemPrices = client.getAllItemPrices(env, itemIds)
-    val itemPriceIdToItemType = itemPrices.map { it.id to it.type }.toMap()
-    val itemPricesByTypes = itemPrices.groupBy { it.type }
+    val items = client.getAllItems(env)
+    val itemsToItemTypes = items.groupBy { it.type }
+    val itemPrices = client.getAllItemPrices(env, items.map { it.id }.toSet())
+    val itemPriceIdToItemType = itemPrices.map { it.id to itemsToItemTypes[it.itemId] }.toMap()
+    val itemPricesByTypes = itemPrices.groupBy { itemsToItemTypes[it.itemId] }
 
     client.getAllLineItemDiscounts(env)
         .forEach { discount ->
@@ -29,11 +28,11 @@ fun main() {
 
             val applicableItemTypes = itemPriceIds.map { itemPriceIdToItemType[it] }.distinct()
 
-            if (applicableItemTypes.size> 1) {
+            if (applicableItemTypes.size > 1) {
                 println("Coupon $discount.id is applied to multiple item types: $applicableItemTypes")
             }
 
-            applicableItemTypes.forEach {itemType ->
+            applicableItemTypes.forEach { itemType ->
                 val allItemPriceIdsOfType = itemPricesByTypes[itemType]?.map {
                     it.id
                 } ?: emptyList()

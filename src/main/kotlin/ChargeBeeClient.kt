@@ -1,32 +1,31 @@
 package org.example
 
+import com.chargebee.models.Item as CbItem
+import com.chargebee.models.ItemPrice as CbItemPrice
 import com.chargebee.Environment
 import com.chargebee.ListResult
 import com.chargebee.internal.ListRequest
 import com.chargebee.models.Coupon
 import com.chargebee.models.Item
-import com.chargebee.models.ItemPrice as CbItemPrice
-import com.chargebee.models.Item as CbItem
 
 class ChargeBeeClient() {
-    fun getAllItemId(env: ChargebeeEnvironment): List<String> = CbItem.list()
+    fun getAllItems(env: ChargebeeEnvironment): List<ChargebeeItem> = CbItem.list()
         .status().`in`(Item.Status.ARCHIVED, Item.Status.ACTIVE)
         .requestAllPages(env)
-        .map { it.item().id() }
+        .filter { !it.item().optString("cf_type").isNullOrEmpty() }
+        .map { ChargebeeItem(it.item().id(), it.item().reqString("cf_type")) }
         .toList()
 
-    fun getAllItemPrices(env: ChargebeeEnvironment, itemIds: List<String> = emptyList()): Sequence<ItemPrice> =
+    fun getAllItemPrices(env: ChargebeeEnvironment, itemIds: Set<String> = emptySet()): Sequence<ChargebeeItemPrice> =
         CbItemPrice.list()
             .status().`in`(CbItemPrice.Status.ARCHIVED, CbItemPrice.Status.ACTIVE)
-            .also {
-                if (itemIds.isNotEmpty()) {
-                    it.itemId().`in`(*itemIds.toTypedArray())
-                }
-            }
             .requestAllPages(env)
+            .filter {
+                itemIds.isEmpty() || itemIds.contains(it.itemPrice().itemId())
+            }
             .map {
                 val ip = it.itemPrice()
-                ItemPrice(ip.id(), ip.reqString("cf_type"), ip.itemId())
+                ChargebeeItemPrice(ip.id(), ip.itemId())
             }
 
     fun getAllLineItemDiscounts(env: ChargebeeEnvironment): Sequence<ChargebeeDiscount> = Coupon.list()
@@ -35,32 +34,45 @@ class ChargeBeeClient() {
         .requestAllPages(env)
         .map {
             val coupon = it.coupon()
-            val constraints = coupon.itemConstraints().map { it.toDomainModel() }
+            val constraints = coupon.itemConstraints().mapNotNull { it.toDomainModel() }
+            val discountType = DiscountType.valueOf(coupon.discountType().name)
+            val discountValue = if (discountType == DiscountType.FIXED_AMOUNT) {
+                coupon.discountAmount().toDouble()
+            } else {
+                coupon.discountPercentage()
+            }
+
             ChargebeeDiscount(
                 coupon.id(),
                 coupon.name(),
-                DiscountType.valueOf(coupon.discountType().name),
-                coupon.discountAmount().toDouble(),
+                discountType,
+                discountValue,
                 ChargebeeDiscountApplyOn.EACH_SPECIFIED_ITEM,
                 constraints
             )
         }
 
-    private fun Coupon.ItemConstraint.toDomainModel(): ChargebeeItemConstraint {
+    private fun Coupon.ItemConstraint.toDomainModel(): ChargebeeItemConstraint? {
         val targetType = when (constraint()) {
             Coupon.ItemConstraint.Constraint.ALL -> ChargebeeItemConstraint.TargetType.ALL
             Coupon.ItemConstraint.Constraint.SPECIFIC -> ChargebeeItemConstraint.TargetType.SPECIFIC
-            else -> throw RuntimeException("Unsupported constraint type ${constraint().name} for the coupon")
+            else -> {
+//                println("Unsupported constraint type ${constraint().name} for the coupon")
+                return null
+            }
         }
 
         val itemType = when (itemType()) {
             Coupon.ItemConstraint.ItemType.PLAN -> ChargebeeItemConstraint.ItemType.PLAN
             Coupon.ItemConstraint.ItemType.ADDON -> ChargebeeItemConstraint.ItemType.ADDON
-            else -> throw RuntimeException("Unsupported item type ${itemType().name} for the coupon")
+            else -> {
+//                println("Unsupported item type ${itemType().name} for the coupon")
+                return null
+            }
         }
 
         val itemIds = if (targetType == ChargebeeItemConstraint.TargetType.SPECIFIC) {
-            itemPriceIds().map { it.toString() }.toSet()
+            itemPriceIds()?.map { it.toString() }?.toSet() ?: emptySet()
         } else emptySet()
 
         return ChargebeeItemConstraint(targetType, itemType, itemIds)
@@ -89,7 +101,7 @@ data class ChargebeeDiscount(
     /**
      * Check if the discount is applicable for an addon.
      */
-    fun isApplicable(itemPrice: ItemPrice): Boolean =
+    fun isApplicable(itemPrice: ChargebeeItemPrice): Boolean =
         itemConstraints.firstOrNull { it.itemType == ChargebeeItemConstraint.ItemType.ADDON }
             ?.isApplicable(itemPrice.id) ?: false
 
@@ -136,10 +148,14 @@ enum class ChargebeeDiscountApplyOn(val value: String) {
     EACH_SPECIFIED_ITEM("each_specified_item"),
 }
 
-data class ItemPrice(
+data class ChargebeeItemPrice(
+    val id: String,
+    val itemId: String,
+)
+
+data class ChargebeeItem(
     val id: String,
     val type: String,
-    val itemId: String,
 )
 
 data class ChargebeeEnvironment(
