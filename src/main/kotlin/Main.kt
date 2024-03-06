@@ -3,7 +3,7 @@ package org.example
 import com.chargebee.models.Export.ItemPricesRequest
 
 fun main() {
-    val env = ChargebeeEnvironment("personio", "the-key")
+    val env = ChargebeeEnvironment("site", "the-key")
     val client = ChargeBeeClient()
 
     val itemIds = client.getAllItemId(env)
@@ -38,6 +38,7 @@ fun main() {
                     it.id
                 } ?: emptyList()
 
+                // Find out the missing items
                 val missingItemPriceIds = allItemPriceIdsOfType - itemPriceIds
                 if (missingItemPriceIds.isNotEmpty()) {
                     println("Coupon ${discount.id}: Missing item prices: $missingItemPriceIds")
