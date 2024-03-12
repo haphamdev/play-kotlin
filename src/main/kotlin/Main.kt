@@ -1,5 +1,13 @@
 package org.example
 
+val ITEM_TYPE_GROUPS = listOf(
+    setOf("Core", "Core_Pro", "Core_Lite"),
+    setOf("Essential", "Professional", "Enterprise"),
+    setOf("conversations_standard", "conversations_standard", "conversations_premium_plus", "conversations_lite"),
+)
+
+const val DRY_RUN = true
+
 fun main() {
     val env = ChargebeeEnvironment("site", "the-key")
     val client = ChargeBeeClient()
@@ -20,9 +28,10 @@ fun main() {
             val updatedConstraints = discount.itemConstraints
                 .map { constraint ->
                     if (constraint.targetType == ChargebeeItemConstraint.TargetType.ALL
-                        || constraint.targetType == ChargebeeItemConstraint.TargetType.NONE
                     ) {
                         println("Coupon ${discount.id} with constraint ${constraint.itemType} is applied to all ${constraint.itemType}s")
+                        constraint
+                    } else if (constraint.targetType == ChargebeeItemConstraint.TargetType.NONE) {
                         constraint
                     } else {
                         val itemPriceIds = constraint.itemIds
@@ -42,9 +51,14 @@ fun main() {
                         }
 
                         val allItemPriceIdsByTypes = applicableItemTypes.flatMap { itemType ->
-                            itemPricesByTypes[itemType]?.map {
-                                it.id
-                            } ?: emptyList()
+                            val itemTypeGroup =
+                                ITEM_TYPE_GROUPS.firstOrNull { it.contains(itemType) } ?: setOf(itemType)
+
+                            itemTypeGroup.flatMap { subItemType ->
+                                itemPricesByTypes[subItemType]?.map {
+                                    it.id
+                                } ?: emptyList()
+                            }
                         }.toSet()
 
                         // Find out the missing items
@@ -59,7 +73,11 @@ fun main() {
                 }
 
             if (updatedConstraints.any { !discount.itemConstraints.contains(it) }) {
-                client.updateDiscountConstraints(env, discount.id, updatedConstraints)
+                println("Updating coupon ${discount.id} constraints for missing item prices")
+                if (!DRY_RUN) {
+                    client.updateDiscountConstraints(env, discount.id, updatedConstraints)
+                    println("Updated coupon ${discount.id} constraints for missing item prices")
+                }
             }
 
         }
