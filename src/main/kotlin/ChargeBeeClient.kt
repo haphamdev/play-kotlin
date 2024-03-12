@@ -14,7 +14,13 @@ class ChargeBeeClient() {
         .status().`in`(Item.Status.ARCHIVED, Item.Status.ACTIVE)
         .requestAllPages(env)
         .filter { !it.item().optString("cf_type").isNullOrEmpty() }
-        .map { ChargebeeItem(it.item().id(), it.item().reqString("cf_type")) }
+        .map {
+            ChargebeeItem(
+                id = it.item().id(),
+                type = it.item().reqString("cf_type"),
+                isTrial = it.item().optString("cf_special_offer") == "trial",
+            )
+        }
         .toList()
 
     fun getAllItemPrices(env: ChargebeeEnvironment, itemIds: Set<String> = emptySet()): Sequence<ChargebeeItemPrice> =
@@ -26,7 +32,16 @@ class ChargeBeeClient() {
             }
             .map {
                 val ip = it.itemPrice()
-                ChargebeeItemPrice(ip.id(), ip.itemId())
+
+                ChargebeeItemPrice(
+                    id = ip.id(),
+                    itemId = ip.itemId(),
+                    isFree = ip.price() == 0L
+                        || (
+                        ip.price() == null
+                            && ip.tiers().all { tier -> tier.price() == null || tier.price() == 0L }
+                        ),
+                )
             }
 
     fun getAllLineItemDiscounts(env: ChargebeeEnvironment): Sequence<ChargebeeDiscount> = Coupon.list()
@@ -155,11 +170,13 @@ enum class ChargebeeDiscountApplyOn(val value: String) {
 data class ChargebeeItemPrice(
     val id: String,
     val itemId: String,
+    val isFree: Boolean,
 )
 
 data class ChargebeeItem(
     val id: String,
     val type: String,
+    val isTrial: Boolean,
 )
 
 data class ChargebeeEnvironment(

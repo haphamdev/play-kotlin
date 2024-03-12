@@ -16,11 +16,18 @@ fun main() {
     val itemsById = items.associateBy { it.id }
     val itemPrices = client.getAllItemPrices(env, items.map { it.id }.toSet())
     val itemPriceIdToItemType = itemPrices
-        .filter { itemsById.contains(it.itemId) }
+        .filter { itemsById.containsKey(it.itemId) }
         .map { it.id to itemsById[it.itemId]!!.type }
         .toMap()
+
+    val trialItemPriceIds = itemPrices
+        .filter { it.isFree || (itemsById[it.itemId]?.isTrial ?: false) }
+        .map { it.id }
+        .toSet()
+
     val itemPricesByTypes = itemPrices
         .filter { itemsById.contains(it.itemId) }
+        .filter { !trialItemPriceIds.contains(it.id) }
         .groupBy { itemsById[it.itemId]!!.type }
 
     client.getAllLineItemDiscounts(env)
@@ -61,11 +68,30 @@ fun main() {
                             }
                         }.toSet()
 
+                        var finalItemPriceIds = itemPriceIds
+
                         // Find out the missing items
                         val missingItemPriceIds = allItemPriceIdsByTypes - itemPriceIds
                         if (missingItemPriceIds.isNotEmpty()) {
                             println("Coupon ${discount.id} with constraint ${constraint.itemType}: Missing item prices: $missingItemPriceIds")
-                            constraint.copy(itemIds = allItemPriceIdsByTypes + itemPriceIds)
+                            finalItemPriceIds = finalItemPriceIds + allItemPriceIdsByTypes
+                        }
+
+                        if (finalItemPriceIds.any { trialItemPriceIds.contains(it) }) {
+                            println(
+                                "Coupon ${discount.id} with constraint ${constraint.itemType}: Contains trial or free item ${
+                                    finalItemPriceIds.filter {
+                                        trialItemPriceIds.contains(
+                                            it
+                                        )
+                                    }
+                                }"
+                            )
+                            finalItemPriceIds = finalItemPriceIds.filter { !trialItemPriceIds.contains(it) }.toSet()
+                        }
+
+                        if (finalItemPriceIds != itemPriceIds) {
+                            constraint.copy(itemIds = finalItemPriceIds)
                         } else {
                             constraint
                         }
@@ -73,11 +99,12 @@ fun main() {
                 }
 
             if (updatedConstraints.any { !discount.itemConstraints.contains(it) }) {
-                println("Updating coupon ${discount.id} constraints for missing item prices")
+                println("Updating coupon ${discount.id} constraints")
                 if (!DRY_RUN) {
                     client.updateDiscountConstraints(env, discount.id, updatedConstraints)
-                    println("Updated coupon ${discount.id} constraints for missing item prices")
+                    println("Updated coupon ${discount.id} constraints")
                 }
+                println("----------------------------")
             }
 
         }
