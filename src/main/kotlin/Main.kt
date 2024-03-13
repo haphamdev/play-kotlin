@@ -9,7 +9,7 @@ val ITEM_TYPE_GROUPS = listOf(
 const val DRY_RUN = true
 
 fun main() {
-    val env = ChargebeeEnvironment("site", "the-key")
+    val env = ChargebeeEnvironment("personio-site", "key")
     val client = ChargeBeeClient()
 
     val items = client.getAllItems(env)
@@ -51,6 +51,14 @@ fun main() {
                             )
                         }
 
+                        if (constraint.itemType == ChargebeeItemConstraint.ItemType.PLAN) {
+                            println("Coupon ${discount.id} with constraint ${constraint.itemType} is applied to all plan")
+                            return@map ChargebeeItemConstraint(
+                                targetType = ChargebeeItemConstraint.TargetType.ALL,
+                                itemType = constraint.itemType
+                            )
+                        }
+
                         val applicableItemTypes = itemPriceIds.mapNotNull { itemPriceIdToItemType[it] }.distinct()
 
                         if (applicableItemTypes.size > 1) {
@@ -79,7 +87,7 @@ fun main() {
 
                         if (finalItemPriceIds.any { trialItemPriceIds.contains(it) }) {
                             println(
-                                "Coupon ${discount.id} with constraint ${constraint.itemType}: Contains trial or free item ${
+                                "Remove following items on Coupon ${discount.id} with constraint ${constraint.itemType}: Contains trial or free item ${
                                     finalItemPriceIds.filter {
                                         trialItemPriceIds.contains(
                                             it
@@ -104,6 +112,9 @@ fun main() {
                     client.updateDiscountConstraints(env, discount.id, updatedConstraints)
                     println("Updated coupon ${discount.id} constraints")
                 }
+                println("----------------------------")
+            } else {
+                println("Skip updating coupon ${discount.id}")
                 println("----------------------------")
             }
 

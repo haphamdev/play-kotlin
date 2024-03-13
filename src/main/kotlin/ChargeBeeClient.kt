@@ -10,6 +10,54 @@ import com.chargebee.models.Item
 import com.chargebee.org.json.JSONArray
 
 class ChargeBeeClient() {
+    companion object {
+        val BLACKLIST_COUPON_IDS = listOf(
+            "9%_discount_excl_epdv2",
+            "38%_discount_excl_epd_and_datev_and_rec",
+            "38%_discount_excl_epd_and_datev",
+            "35%_discount_excl_conversations",
+            "20%_discount_excl_datev",
+            "23%_discount_excl_conversations",
+            "30%_discount_excl_epd_v3",
+            "100%_discount_excl_epd_2",
+            "100%_discount_excl_epd",
+            "38%_discount_excl_epd",
+            "41%_discount_excl_conversations",
+            "42%_discount_excl_epd",
+            "10%_discount_excl_epd_new",
+            "15%_discount_excl_epd_v3",
+            "25%_discount_excl_epd_v3",
+            "57%_discount_excl_epd",
+            "43%_discount_excl_datev",
+            "9%_discount_excl_epd",
+            "18%_discount_excl_epd",
+            "32.5%_discount_excl_epd",
+            "35%_discount_excl_epd",
+            "30%_discount_excl_epd_v2",
+            "27%_discount_excl_epd",
+            "33%_discount_excl_epd",
+            "56%_discount_excl_epd",
+            "50%_discount_excl_epd",
+            "40%_discount_excl_epd",
+            "10%_discount_excl_epd",
+            "5%_discount_excl_epd",
+            "30%_discount_excl_epd",
+            "25%_discount_excl_epd_v2",
+            "20%_discount_excl_epd_v2",
+            "15%_discount_excl_epd_v2",
+            "8%_discount_excl_epd_v2",
+            "20%_discount_excl_epd_v1",
+            "8%_discount_excl_epd_temp",
+            "25%_discount_excl_epd_temp",
+            "15%_discount_excl_epd_temp",
+            "20%_discount_excl_epd_temp",
+            "35%DISCOUNTEXCLSURVEY",
+            "10%DISCOUNT(EXCL.EPD)V2",
+            "40%DISCOUNT(EXCL.EPD)V2",
+            "52.5%DISCOUNT(EXCL.EPD)SAETA",
+            "42.29%DISCOUNT(EXCL.EPD)",
+        )
+    }
     fun getAllItems(env: ChargebeeEnvironment): List<ChargebeeItem> = CbItem.list()
         .status().`in`(Item.Status.ARCHIVED, Item.Status.ACTIVE)
         .requestAllPages(env)
@@ -48,8 +96,12 @@ class ChargeBeeClient() {
         .status().`in`(Coupon.Status.ARCHIVED, Coupon.Status.ACTIVE)
         .applyOn().`is`(Coupon.ApplyOn.EACH_SPECIFIED_ITEM)
         .requestAllPages(env)
-        .map {
+        .mapNotNull {
             val coupon = it.coupon()
+
+            if (BLACKLIST_COUPON_IDS.contains(coupon.id())) {
+                return@mapNotNull null
+            }
             val constraints = coupon.itemConstraints().mapNotNull { it.toDomainModel() }
             val discountType = DiscountType.valueOf(coupon.discountType().name)
             val discountValue = if (discountType == DiscountType.FIXED_AMOUNT) {
@@ -84,6 +136,7 @@ class ChargeBeeClient() {
             var nextOffset: String? = null
             do {
                 val result = this@requestAllPages.limit(100).offset(nextOffset).request(chargebeeEnvironment)
+                println("Receiving result from Chargebee ...")
 
                 nextOffset = result.nextOffset()
                 yieldAll(result)
@@ -140,6 +193,7 @@ data class ChargebeeItemConstraint(
         ALL("all"),
         SPECIFIC("specific"),
         NONE("none"),
+        CRITERIA("criteria"),
     }
 
     /**
