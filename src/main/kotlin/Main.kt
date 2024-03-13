@@ -39,6 +39,7 @@ fun main() {
                 .map { constraint ->
                     when (constraint.itemType) {
                         ChargebeeItemConstraint.ItemType.PLAN -> {
+                            if (constraint.targetType == ChargebeeItemConstraint.TargetType.NONE) return@map constraint
                             appliedToPlan = true
                             val checkResult = checkPlanConstraint(constraint, discount)
                             if (checkResult.manualCheckNeeded) manualCheckNeeded = true
@@ -46,6 +47,7 @@ fun main() {
                         }
 
                         ChargebeeItemConstraint.ItemType.ADDON -> {
+                            if (constraint.targetType == ChargebeeItemConstraint.TargetType.NONE) return@map constraint
                             appliedToAddon = true
                             val checkResult = checkAddonConstraint(
                                 constraint,
@@ -61,8 +63,10 @@ fun main() {
                         }
 
                         ChargebeeItemConstraint.ItemType.CHARGE -> {
-                            println("Coupon ${discount.id} is applied to CHARGES. Manual check needed.")
-                            manualCheckNeeded = true
+                            if (constraint.targetType != ChargebeeItemConstraint.TargetType.NONE) {
+                                println("Coupon ${discount.id} is applied to CHARGES. Manual check needed.")
+                                manualCheckNeeded = true
+                            }
                             return@map constraint
                         }
                     }
@@ -73,10 +77,10 @@ fun main() {
                 println("Coupon ${discount.id} is applied to both PLANS and ADDONS. Manual check needed")
             }
 
-            if (updatedConstraints.any { !discount.itemConstraints.contains(it) }) {
-                if (manualCheckNeeded) {
-                    println("Skip coupon ${discount.id} for manual check")
-                } else if (!DRY_RUN ) {
+            if (manualCheckNeeded) {
+                println("Skip coupon ${discount.id} for manual check")
+            } else if (updatedConstraints.any { !discount.itemConstraints.contains(it) }) {
+                if (DRY_RUN) {
                     println("Skip updating coupon ${discount.id} in DRY RUN mode")
                 } else {
                     println("Updating coupon ${discount.id}...")
