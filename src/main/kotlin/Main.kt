@@ -9,7 +9,11 @@ val ITEM_TYPE_GROUPS = listOf(
 const val DRY_RUN = true
 
 fun main() {
+<<<<<<< HEAD
     val env = ChargebeeEnvironment("personio", "live_Ld9tqwNsoNlZSECTFxzUrSMdUHVZdwcdR")
+=======
+    val env = ChargebeeEnvironment("site-name", "api-key")
+>>>>>>> refs/remotes/origin/prelease/1
     val client = ChargeBeeClient()
 
     val items = client.getAllItems(env)
