@@ -60,7 +60,7 @@ class ChargeBeeClient() {
     }
     fun getAllItems(env: ChargebeeEnvironment): List<ChargebeeItem> = CbItem.list()
         .status().`in`(Item.Status.ARCHIVED, Item.Status.ACTIVE)
-        .requestAllPages(env)
+        .requestAllPages(env, "Fetching all items...")
         .filter { !it.item().optString("cf_type").isNullOrEmpty() }
         .map {
             ChargebeeItem(
@@ -74,7 +74,7 @@ class ChargeBeeClient() {
     fun getAllItemPrices(env: ChargebeeEnvironment, itemIds: Set<String> = emptySet()): Sequence<ChargebeeItemPrice> =
         CbItemPrice.list()
             .status().`in`(CbItemPrice.Status.ARCHIVED, CbItemPrice.Status.ACTIVE)
-            .requestAllPages(env)
+            .requestAllPages(env, "Fetching all Item prices...")
             .filter {
                 itemIds.isEmpty() || itemIds.contains(it.itemPrice().itemId())
             }
@@ -95,7 +95,7 @@ class ChargeBeeClient() {
     fun getAllLineItemDiscounts(env: ChargebeeEnvironment): Sequence<ChargebeeDiscount> = Coupon.list()
         .status().`in`(Coupon.Status.ARCHIVED, Coupon.Status.ACTIVE)
         .applyOn().`is`(Coupon.ApplyOn.EACH_SPECIFIED_ITEM)
-        .requestAllPages(env)
+        .requestAllPages(env, "Fetching all Line-item discounts...")
         .mapNotNull {
             val coupon = it.coupon()
 
@@ -131,12 +131,12 @@ class ChargeBeeClient() {
         return ChargebeeItemConstraint(targetType, itemType, itemIds)
     }
 
-    private fun ListRequest<*>.requestAllPages(chargebeeEnvironment: ChargebeeEnvironment) =
+    private fun ListRequest<*>.requestAllPages(chargebeeEnvironment: ChargebeeEnvironment, msg: String = "Receiving result from ChargeBee") =
         sequence<ListResult.Entry> {
             var nextOffset: String? = null
             do {
                 val result = this@requestAllPages.limit(100).offset(nextOffset).request(chargebeeEnvironment)
-                println("Receiving result from Chargebee ...")
+                println(msg)
 
                 nextOffset = result.nextOffset()
                 yieldAll(result)
