@@ -1,10 +1,16 @@
 package org.example
 
-const val DRY_RUN = true
+const val DRY_RUN = false
 
 fun main() {
     val site  = System.getenv("CHARGEBEE_SITE")
     val apiKey  = System.getenv("CHARGEBEE_API_KEY")
+
+    if (site != "personio") {
+        println("🔥Site: $site. Please check again")
+    } else {
+        println("Running for site $site")
+    }
 
     val chargebeeEnv = ChargebeeEnvironment(site, apiKey)
     val chargebeeClient = ChargeBeeClient()

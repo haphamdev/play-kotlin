@@ -1,0 +1,14 @@
+[33md96255e[m[33m ([m[1;36mHEAD -> [m[1;32mhapham/correct-applicable-addons-for-all-plans[m[33m)[m Use env var
+[33m9af5517[m[33m ([m[1;31morigin/hapham/correct-applicable-addons-for-all-plans[m[33m)[m Update logs
+[33me8f7b60[m Applying 'applicable addons' for v5/v6 plans
+[33m9a05226[m[33m ([m[1;31morigin/prelease/1[m[33m)[m Refactor for clearer logs
+[33mf8e8ad2[m Refactor for clearer logs
+[33mba203da[m Refactor for clearer logs
+[33m99c70fa[m Prelease 1
+[33mf6121ba[m Filter free & trial item
+[33m7c39bcb[m Item type groups & dry run
+[33me689276[m Call API to correct discounts
+[33m36a012a[m Make it runs
+[33ma3e208d[m[33m ([m[1;32mmaster[m[33m, [m[1;32mmain[m[33m)[m Add some logs
+[33m658fcf6[m Check all line item discounts
+[33maa69ddf[m Initial commit
