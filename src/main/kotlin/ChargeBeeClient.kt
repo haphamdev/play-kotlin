@@ -3,6 +3,7 @@ package org.example
 import com.chargebee.Environment
 import com.chargebee.ListResult
 import com.chargebee.internal.ListRequest
+import com.chargebee.models.AttachedItem
 import com.chargebee.models.Item
 import com.chargebee.models.Item as CbItem
 
@@ -92,8 +93,14 @@ class ChargeBeeClient {
     ) {
         CbItem.update(planId)
             .itemApplicability(Item.ItemApplicability.RESTRICTED)
-            .applicableItems(*addonIds.toTypedArray())
             .request(env)
+
+        for (addonId in addonIds) {
+            AttachedItem.create(planId)
+                .itemId(addonId)
+                .type(AttachedItem.Type.OPTIONAL)
+                .request(env)
+        }
     }
 }
 

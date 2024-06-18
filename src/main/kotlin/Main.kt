@@ -6,7 +6,7 @@ fun main() {
     val site  = System.getenv("CHARGEBEE_SITE")
     val apiKey  = System.getenv("CHARGEBEE_API_KEY")
 
-    if (site != "personio") {
+    if (site != "personio-test") {
         println("🔥Site: $site. Please check again")
     } else {
         println("Running for site $site")
