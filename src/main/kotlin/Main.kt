@@ -23,6 +23,7 @@ fun main() {
                     addonsGroupedByVersion[version]!!.joinToString("\n- ") { it.id }
         )
     }
+
     chargebeeClient.getAllPlans(chargebeeEnv)
         .forEach { plan ->
             val applicableAddonIds = addonsGroupedByVersion[plan.majorVersion]!!.map { it.id }
