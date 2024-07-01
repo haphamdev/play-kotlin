@@ -28,28 +28,19 @@ class ChargeBeeClient {
 
     private val file = File("./output.txt")
 
-    fun getAllPlans(env: ChargebeeEnvironment): Sequence<ChargebeeItem> = CbItem.list()
+    fun getAllPlans(env: ChargebeeEnvironment): Sequence<String> = CbItem.list()
         .type().`is`(Item.Type.PLAN)
         .status().`is`(Item.Status.ACTIVE)
         .requestAllPages(env, "Fetching all plans...")
         .mapNotNull {
             val item = it.item()
-            val cfType = item.optString("cf_type")
             val version = item.optInteger("cf_pricing_version")
-            if (cfType.isNullOrEmpty() ||
-                BLACKLIST_PLAN_TYPES.contains(cfType) ||
-                version == null ||
-                version < 5 || version > 6
-            ) return@mapNotNull null
-            ChargebeeItem(
-                id = item.id(),
-                type = cfType,
-                isTrial = it.item().optString("cf_special_offer") == "trial",
-                majorVersion = version,
-            )
+            //Only fetch v7 plans
+            if (version == null || version != 7) return@mapNotNull null
+            item.id()
         }
 
-    fun getAllAddons(env: ChargebeeEnvironment): Sequence<ChargebeeItem> = CbItem.list()
+    fun getAllAddons(env: ChargebeeEnvironment): Sequence<String> = CbItem.list()
         .type().`is`(Item.Type.ADDON)
         .status().`is`(Item.Status.ACTIVE)
         .requestAllPages(env, "Fetching all addons...")
@@ -57,18 +48,10 @@ class ChargeBeeClient {
             val item = it.item()
             val cfType = item.optString("cf_type")
             val version = item.optInteger("cf_pricing_version")
-            if (
-                cfType.isNullOrEmpty() ||
-                BLACKLIST_ADDON_TYPES.contains(cfType) ||
-                version == null ||
-                version < 5 || version > 6
-            ) return@mapNotNull null
-            ChargebeeItem(
-                id = item.id(),
-                type = cfType,
-                isTrial = it.item().optString("cf_special_offer") == "trial",
-                majorVersion = version,
-            )
+            //Only fetch v7 addons
+            if (version == null || version != 7) return@mapNotNull null
+
+            item.id()
         }
 
 

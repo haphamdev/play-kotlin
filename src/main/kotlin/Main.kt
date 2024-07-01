@@ -1,5 +1,8 @@
 package org.example
 
+import java.io.File
+import kotlin.io.path.fileVisitor
+
 const val DRY_RUN = false
 
 fun main() {
@@ -14,27 +17,20 @@ fun main() {
 
     val chargebeeEnv = ChargebeeEnvironment(site, apiKey)
     val chargebeeClient = ChargeBeeClient()
-    val addonsGroupedByVersion = chargebeeClient.getAllAddons(chargebeeEnv)
-        .groupBy { it.majorVersion }
+    val addonIds = chargebeeClient.getAllAddons(chargebeeEnv).toList()
 
-    addonsGroupedByVersion.keys.forEach { version ->
-        println(
-            "V$version addons:\n- " +
-                    addonsGroupedByVersion[version]!!.joinToString("\n- ") { it.id }
-        )
-    }
-
+    val file = File("output.txt")
+    file.writeText("item[id],attached_item[item_id],attached_item[type]")
     chargebeeClient.getAllPlans(chargebeeEnv)
         .forEach { plan ->
-            val applicableAddonIds = addonsGroupedByVersion[plan.majorVersion]!!.map { it.id }
-            println("Updating plan '${plan.id}' with v${plan.majorVersion} addons")
+            println("Updating plan $plan")
             if (!DRY_RUN) {
                 chargebeeClient.updateApplicableAddonsForPlan(
                     env = chargebeeEnv,
-                    planId = plan.id,
-                    addonIds = applicableAddonIds
+                    planId = plan,
+                    addonIds = addonIds
                 )
-                println("Updated plan '${plan.id}'")
+                println("Updated plan '$plan'")
             }
         }
 }
