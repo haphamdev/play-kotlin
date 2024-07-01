@@ -19,8 +19,6 @@ fun main() {
     val chargebeeClient = ChargeBeeClient()
     val addonIds = chargebeeClient.getAllAddons(chargebeeEnv).toList()
 
-    val file = File("output.txt")
-    file.writeText("item[id],attached_item[item_id],attached_item[type]")
     chargebeeClient.getAllPlans(chargebeeEnv)
         .forEach { plan ->
             println("Updating plan $plan")

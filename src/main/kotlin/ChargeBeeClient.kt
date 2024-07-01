@@ -3,6 +3,7 @@ package org.example
 import com.chargebee.Environment
 import com.chargebee.ListResult
 import com.chargebee.internal.ListRequest
+import com.chargebee.models.AttachedItem
 import com.chargebee.models.Item
 import java.io.File
 import com.chargebee.models.Item as CbItem
@@ -25,8 +26,6 @@ class ChargeBeeClient {
             "volume_based_job_postings"
         )
     }
-
-    private val file = File("./output.txt")
 
     fun getAllPlans(env: ChargebeeEnvironment): Sequence<String> = CbItem.list()
         .type().`is`(Item.Type.PLAN)
@@ -80,10 +79,9 @@ class ChargeBeeClient {
             .request(env)
 
         for (addonId in addonIds) {
-            /*
-            This file will be used for ChargeBee import to create attached items for all plans
-             */
-            file.appendText("$planId,$addonId,optional\n")
+            AttachedItem.create(planId).itemId(addonId)
+                .type(AttachedItem.Type.OPTIONAL)
+                .request(env)
         }
     }
 }
